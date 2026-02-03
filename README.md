@@ -71,3 +71,4 @@ export default defineConfig([
   },
 ])
 ```
+Opdateret 2026
