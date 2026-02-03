@@ -2,22 +2,39 @@ if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
   (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Send, FileText, X, Loader2 } from 'lucide-react';
 import { config } from './config';
 
 const API_BASE_URL = config.apiUrl;
 
+interface Message {
+  role: string;
+  content: string;
+}
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  content: string;
+}
+
+interface UserProfile {
+  id?: string;
+  experience: string;
+  training: string;
+}
+
 export default function TRForhandlingsbot() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [userProfile, setUserProfile] = useState(null);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,47 +44,35 @@ export default function TRForhandlingsbot() {
     scrollToBottom();
   }, [messages]);
 
-  // Check if user has existing profile on mount
   useEffect(() => {
     const checkProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {});
+        const response = await fetch(`${API_BASE_URL}/api/chat/profile`);
         const data = await response.json();
-
+        
         if (data.user && data.user.experience && data.user.training) {
           setUserProfile(data.user);
           setShowOnboarding(false);
-
-          // Load conversation history
-          const historyResponse = await fetch(
-            `${API_BASE_URL}/api/chat/history`,
-            {}
-          );
+          
+          const historyResponse = await fetch(`${API_BASE_URL}/api/chat/history`);
           const historyData = await historyResponse.json();
-
+          
           if (historyData.messages && historyData.messages.length > 0) {
             setMessages(historyData.messages);
           } else {
-            // Show welcome message
-            const welcomeMessage = generateWelcomeMessage(
-              data.user.experience,
-              data.user.training
-            );
+            const welcomeMessage = generateWelcomeMessage(data.user.experience, data.user.training);
             setMessages([{ role: 'assistant', content: welcomeMessage }]);
           }
-
-          // Load uploaded files
-          const filesResponse = await fetch(`${API_BASE_URL}/api/files`, {});
+          
+          const filesResponse = await fetch(`${API_BASE_URL}/api/files`);
           const filesData = await filesResponse.json();
-
+          
           if (filesData.files) {
-            setUploadedFiles(
-              filesData.files.map((f) => ({
-                id: f.id,
-                name: f.name,
-                content: f.content,
-              }))
-            );
+            setUploadedFiles(filesData.files.map((f: any) => ({
+              id: f.id,
+              name: f.name,
+              content: f.content
+            })));
           }
         }
       } catch (error) {
@@ -80,7 +85,7 @@ export default function TRForhandlingsbot() {
     checkProfile();
   }, []);
 
-  const generateWelcomeMessage = (experience, training) => {
+  const generateWelcomeMessage = (experience: string, training: string) => {
     let welcomeMessage = `Velkommen! Jeg er her for at hjælpe dig med forhandlingsrådgivning. `;
 
     if (experience === 'under1') {
@@ -111,7 +116,7 @@ export default function TRForhandlingsbot() {
     return welcomeMessage;
   };
 
-  const handleOnboardingComplete = async (experience, training) => {
+  const handleOnboardingComplete = async (experience: string, training: string) => {
     if (!experience || !training) return;
 
     try {
@@ -120,12 +125,11 @@ export default function TRForhandlingsbot() {
         headers: {
           'Content-Type': 'application/json',
         },
-
-        body: JSON.stringify({ experience, training }),
+        body: JSON.stringify({ experience, training })
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
         const profile = data.user;
         setUserProfile(profile);
@@ -140,18 +144,18 @@ export default function TRForhandlingsbot() {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
 
-    for (const file of files) {
+    for (const file of Array.from(files)) {
       try {
         const formData = new FormData();
         formData.append('file', file);
 
         const response = await fetch(`${API_BASE_URL}/api/files`, {
           method: 'POST',
-
-          body: formData,
+          body: formData
         });
 
         if (!response.ok) {
@@ -159,23 +163,23 @@ export default function TRForhandlingsbot() {
         }
 
         const data = await response.json();
-
+        
         if (data.success && data.file) {
           setUploadedFiles((prev) => [
             ...prev,
-            {
+            { 
               id: data.file.id,
-              name: data.file.name,
-              content: data.file.content,
-            },
+              name: data.file.name, 
+              content: data.file.content 
+            }
           ]);
 
           setMessages((prev) => [
             ...prev,
             {
               role: 'assistant',
-              content: `✅ Jeg har læst "${data.file.name}" og er klar til at bruge indholdet i vores rådgivning.`,
-            },
+              content: `✅ Jeg har læst "${data.file.name}" og er klar til at bruge indholdet i vores rådgivning.`
+            }
           ]);
         }
       } catch (error) {
@@ -184,17 +188,17 @@ export default function TRForhandlingsbot() {
           ...prev,
           {
             role: 'assistant',
-            content: `⚠️ Fejl ved upload af ${file.name}. Prøv evt. at gemme dokumentet som en simpel .txt fil.`,
-          },
+            content: `⚠️ Fejl ved upload af ${file.name}. Prøv evt. at gemme dokumentet som en simpel .txt fil.`
+          }
         ]);
       }
     }
   };
 
-  const removeFile = async (fileId, fileName) => {
+  const removeFile = async (fileId: string, fileName: string) => {
     try {
       await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
-        method: 'DELETE',
+        method: 'DELETE'
       });
 
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
@@ -202,8 +206,8 @@ export default function TRForhandlingsbot() {
         ...prev,
         {
           role: 'system',
-          content: `🗑️ Fjernet dokument: ${fileName}`,
-        },
+          content: `🗑️ Fjernet dokument: ${fileName}`
+        }
       ]);
     } catch (error) {
       console.error('Delete file error:', error);
@@ -219,9 +223,9 @@ export default function TRForhandlingsbot() {
     setIsLoading(true);
 
     try {
-      const fileContents = uploadedFiles.map((f) => ({
+      const fileContents = uploadedFiles.map(f => ({
         name: f.name,
-        content: f.content,
+        content: f.content
       }));
 
       const response = await fetch(`${API_BASE_URL}/api/chat/chat`, {
@@ -229,11 +233,10 @@ export default function TRForhandlingsbot() {
         headers: {
           'Content-Type': 'application/json',
         },
-
         body: JSON.stringify({
           message: userMessage,
-          fileContents: fileContents,
-        }),
+          fileContents: fileContents
+        })
       });
 
       if (!response.ok) {
@@ -242,10 +245,10 @@ export default function TRForhandlingsbot() {
       }
 
       const data = await response.json();
-
+      
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: data.message },
+        { role: 'assistant', content: data.message }
       ]);
     } catch (error) {
       console.error('Chat error:', error);
@@ -253,8 +256,8 @@ export default function TRForhandlingsbot() {
         ...prev,
         {
           role: 'assistant',
-          content: `⚠️ Der opstod en fejl: ${error.message}. Prøv venligst igen.`,
-        },
+          content: `⚠️ Der opstod en fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}. Prøv venligst igen.`
+        }
       ]);
     } finally {
       setIsLoading(false);
@@ -299,7 +302,7 @@ export default function TRForhandlingsbot() {
                       setUserProfile({
                         ...userProfile,
                         experience: option.value,
-                      })
+                      } as UserProfile)
                     }
                     className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
                       userProfile?.experience === option.value
@@ -325,7 +328,7 @@ export default function TRForhandlingsbot() {
                   <button
                     key={option.value}
                     onClick={() =>
-                      setUserProfile({ ...userProfile, training: option.value })
+                      setUserProfile({ ...userProfile, training: option.value } as UserProfile)
                     }
                     className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
                       userProfile?.training === option.value
@@ -342,8 +345,8 @@ export default function TRForhandlingsbot() {
             <button
               onClick={() =>
                 handleOnboardingComplete(
-                  userProfile?.experience,
-                  userProfile?.training
+                  userProfile?.experience || '',
+                  userProfile?.training || ''
                 )
               }
               disabled={!userProfile?.experience || !userProfile?.training}
@@ -363,7 +366,6 @@ export default function TRForhandlingsbot() {
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Header */}
       <div className="bg-white shadow-md border-b border-gray-200 p-4">
         <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
           TR Forhandlingsbot
@@ -373,7 +375,6 @@ export default function TRForhandlingsbot() {
         </p>
       </div>
 
-      {/* Uploaded Files */}
       {uploadedFiles.length > 0 && (
         <div className="bg-blue-50 border-b border-blue-200 p-3">
           <div className="flex flex-wrap gap-2">
@@ -396,7 +397,6 @@ export default function TRForhandlingsbot() {
         </div>
       )}
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, idx) => (
           <div
@@ -432,7 +432,6 @@ export default function TRForhandlingsbot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="bg-white border-t border-gray-200 p-4">
         <div className="flex gap-2 max-w-4xl mx-auto">
           <input
