@@ -25,6 +25,29 @@ interface UserProfile {
   training: string;
 }
 
+// Helper function to make API calls with session management
+async function apiCall(url: string, options: RequestInit = {}): Promise<Response> {
+  // Get session ID from localStorage
+  let sessionId = localStorage.getItem('sessionId');
+
+  // Add session ID to headers if available
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(sessionId && { 'X-Session-ID': sessionId })
+    }
+  });
+
+  // Store session ID from response
+  const newSessionId = response.headers.get('X-Session-ID');
+  if (newSessionId) {
+    localStorage.setItem('sessionId', newSessionId);
+  }
+
+  return response;
+}
+
 export default function TRForhandlingsbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -47,14 +70,14 @@ export default function TRForhandlingsbot() {
   useEffect(() => {
     const checkProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/chat/profile`);
+        const response = await apiCall(`${API_BASE_URL}/api/chat/profile`);
         const data = await response.json();
         
         if (data.user && data.user.experience && data.user.training) {
           setUserProfile(data.user);
           setShowOnboarding(false);
           
-          const historyResponse = await fetch(`${API_BASE_URL}/api/chat/history`);
+          const historyResponse = await apiCall(`${API_BASE_URL}/api/chat/history`);
           const historyData = await historyResponse.json();
           
           if (historyData.messages && historyData.messages.length > 0) {
@@ -64,7 +87,7 @@ export default function TRForhandlingsbot() {
             setMessages([{ role: 'assistant', content: welcomeMessage }]);
           }
           
-          const filesResponse = await fetch(`${API_BASE_URL}/api/files`);
+          const filesResponse = await apiCall(`${API_BASE_URL}/api/files`);
           const filesData = await filesResponse.json();
           
           if (filesData.files) {
@@ -120,7 +143,7 @@ export default function TRForhandlingsbot() {
     if (!experience || !training) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {
+      const response = await apiCall(`${API_BASE_URL}/api/chat/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,7 +176,7 @@ export default function TRForhandlingsbot() {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${API_BASE_URL}/api/files`, {
+        const response = await apiCall(`${API_BASE_URL}/api/files`, {
           method: 'POST',
           body: formData
         });
@@ -197,7 +220,7 @@ export default function TRForhandlingsbot() {
 
   const removeFile = async (fileId: string, fileName: string) => {
     try {
-      await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+      await apiCall(`${API_BASE_URL}/api/files/${fileId}`, {
         method: 'DELETE'
       });
 
@@ -228,7 +251,7 @@ export default function TRForhandlingsbot() {
         content: f.content
       }));
 
-      const response = await fetch(`${API_BASE_URL}/api/chat/chat`, {
+      const response = await apiCall(`${API_BASE_URL}/api/chat/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
