@@ -248,18 +248,25 @@ export default function TRForhandlingsbot() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = '';
+      let buffer = ''; // Buffer for incomplete lines
 
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split by newlines but keep the last incomplete line in buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6);
+            const data = line.slice(6).trim();
+
+            if (!data) continue; // Skip empty data
 
             try {
               const parsed = JSON.parse(data);
@@ -287,7 +294,7 @@ export default function TRForhandlingsbot() {
                 });
               }
             } catch (e) {
-              // Skip invalid JSON
+              console.warn('Failed to parse SSE data:', data, e);
             }
           }
         }
