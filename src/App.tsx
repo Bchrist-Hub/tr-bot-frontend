@@ -79,7 +79,7 @@ export default function TRForhandlingsbot() {
 
           if (filesData.files) {
             setUploadedFiles(
-              filesData.files.map((f) => ({
+              filesData.files.map((f: any) => ({
                 id: f.id,
                 name: f.name,
                 content: f.content,
@@ -371,8 +371,8 @@ export default function TRForhandlingsbot() {
                     key={option.value}
                     onClick={() =>
                       setUserProfile({
-                        ...userProfile,
                         experience: option.value,
+                        training: userProfile?.training || '',
                       })
                     }
                     className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
@@ -399,7 +399,10 @@ export default function TRForhandlingsbot() {
                   <button
                     key={option.value}
                     onClick={() =>
-                      setUserProfile({ ...userProfile, training: option.value })
+                      setUserProfile({
+                        experience: userProfile?.experience || '',
+                        training: option.value,
+                      })
                     }
                     className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
                       userProfile?.training === option.value
@@ -416,8 +419,8 @@ export default function TRForhandlingsbot() {
             <button
               onClick={() =>
                 handleOnboardingComplete(
-                  userProfile?.experience,
-                  userProfile?.training
+                  userProfile?.experience || '',
+                  userProfile?.training || ''
                 )
               }
               disabled={!userProfile?.experience || !userProfile?.training}
