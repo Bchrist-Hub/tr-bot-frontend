@@ -48,7 +48,9 @@ export default function TRForhandlingsbot() {
   useEffect(() => {
     const checkProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {});
+        const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {
+          credentials: 'include'
+        });
         const data = await response.json();
 
         if (data.user && data.user.experience && data.user.training) {
@@ -58,7 +60,9 @@ export default function TRForhandlingsbot() {
           // Load conversation history
           const historyResponse = await fetch(
             `${API_BASE_URL}/api/chat/history`,
-            {}
+            {
+              credentials: 'include'
+            }
           );
           const historyData = await historyResponse.json();
 
@@ -74,7 +78,9 @@ export default function TRForhandlingsbot() {
           }
 
           // Load uploaded files
-          const filesResponse = await fetch(`${API_BASE_URL}/api/files`, {});
+          const filesResponse = await fetch(`${API_BASE_URL}/api/files`, {
+            credentials: 'include'
+          });
           const filesData = await filesResponse.json();
 
           if (filesData.files) {
@@ -134,10 +140,10 @@ export default function TRForhandlingsbot() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-
         body: JSON.stringify({ experience, training }),
       });
 
@@ -167,7 +173,7 @@ export default function TRForhandlingsbot() {
 
         const response = await fetch(`${API_BASE_URL}/api/files`, {
           method: 'POST',
-
+          credentials: 'include',
           body: formData,
         });
 
@@ -212,6 +218,7 @@ export default function TRForhandlingsbot() {
     try {
       await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
 
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
@@ -247,10 +254,10 @@ export default function TRForhandlingsbot() {
 
       const response = await fetch(`${API_BASE_URL}/api/chat/chat`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
-
         body: JSON.stringify({
           message: userMessage,
           fileContents: fileContents,
