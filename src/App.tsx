@@ -2,22 +2,39 @@ if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
   (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Send, FileText, X, Loader2 } from 'lucide-react';
 import { config } from './config';
 
 const API_BASE_URL = config.apiUrl;
 
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface UserProfile {
+  id?: number;
+  experience: string;
+  training: string;
+}
+
+interface UploadedFile {
+  id: number;
+  name: string;
+  content: string;
+}
+
 export default function TRForhandlingsbot() {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [userProfile, setUserProfile] = useState(null);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -80,7 +97,7 @@ export default function TRForhandlingsbot() {
     checkProfile();
   }, []);
 
-  const generateWelcomeMessage = (experience, training) => {
+  const generateWelcomeMessage = (experience: string, training: string) => {
     let welcomeMessage = `Velkommen! Jeg er her for at hjælpe dig med forhandlingsrådgivning. `;
 
     if (experience === 'under1') {
@@ -111,7 +128,7 @@ export default function TRForhandlingsbot() {
     return welcomeMessage;
   };
 
-  const handleOnboardingComplete = async (experience, training) => {
+  const handleOnboardingComplete = async (experience: string, training: string) => {
     if (!experience || !training) return;
 
     try {
@@ -140,8 +157,8 @@ export default function TRForhandlingsbot() {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
 
     for (const file of files) {
       try {
@@ -184,14 +201,14 @@ export default function TRForhandlingsbot() {
           ...prev,
           {
             role: 'assistant',
-            content: `⚠️ Fejl ved upload af ${file.name}. Prøv evt. at gemme dokumentet som en simpel .txt fil.`,
+            content: `⚠️ Fejl ved upload af ${(file as File).name}. Prøv evt. at gemme dokumentet som en simpel .txt fil.`,
           },
         ]);
       }
     }
   };
 
-  const removeFile = async (fileId, fileName) => {
+  const removeFile = async (fileId: number, fileName: string) => {
     try {
       await fetch(`${API_BASE_URL}/api/files/${fileId}`, {
         method: 'DELETE',
@@ -242,6 +259,10 @@ export default function TRForhandlingsbot() {
 
       if (!response.ok) {
         throw new Error(`API fejl: ${response.status}`);
+      }
+
+      if (!response.body) {
+        throw new Error('Ingen response body');
       }
 
       // Read the streaming response
@@ -305,7 +326,7 @@ export default function TRForhandlingsbot() {
         const updated = [...prev];
         updated[assistantMessageIndex] = {
           role: 'assistant',
-          content: `⚠️ Der opstod en fejl: ${error.message}. Prøv venligst igen.`,
+          content: `⚠️ Der opstod en fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}. Prøv venligst igen.`,
         };
         return updated;
       });
