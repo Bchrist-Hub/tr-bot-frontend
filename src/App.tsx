@@ -46,6 +46,8 @@ export default function TRForhandlingsbot() {
   const [profileQuestions, setProfileQuestions] = useState<ProfileQuestion[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cotMode, setCotMode] = useState<'none' | 'internal' | 'visible'>('none');
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -325,9 +327,11 @@ export default function TRForhandlingsbot() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage,
-          fileContents: fileContents,
-        }),
+        message: userMessage,
+        fileContents: fileContents,
+        cotMode: cotMode,
+      }),
+
       });
 
       if (!response.ok) {
@@ -557,9 +561,29 @@ export default function TRForhandlingsbot() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="bg-white border-t border-gray-200 p-4">
-        <div className="flex gap-2 max-w-4xl mx-auto">
+{/* Input */}
+<div className="bg-white border-t border-gray-200 p-4">
+  {/* CoT Mode Selector */}
+  <div className="max-w-4xl mx-auto mb-3">
+    <div className="flex items-center gap-3">
+      <span className="text-sm text-gray-600 font-medium">🧠 Chain of Thought:</span>
+      <select
+        value={cotMode}
+        onChange={(e) => setCotMode(e.target.value as 'none' | 'internal' | 'visible')}
+        className="px-3 py-1.5 text-sm rounded-lg border-2 border-gray-300 focus:border-purple-500 focus:outline-none bg-white"
+      >
+        <option value="none">❌ None (Normal)</option>
+        <option value="internal">🔒 Internal (Thinks, shows answer)</option>
+        <option value="visible">👁️ Visible (Shows analysis)</option>
+      </select>
+      <span className="text-xs text-gray-500 italic">
+        {cotMode === 'none' && 'Standard mode'}
+        {cotMode === 'internal' && 'Model thinks internally, better quality'}
+        {cotMode === 'visible' && 'Shows thinking process to user'}
+      </span>
+    </div>
+  </div>
+  <div className="flex gap-2 max-w-4xl mx-auto">
           <input
             type="file"
             ref={fileInputRef}
