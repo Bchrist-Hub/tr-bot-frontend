@@ -13,10 +13,20 @@ interface Message {
   content: string;
 }
 
+interface ProfileQuestion {
+  key: string;
+  label: string;
+  type: 'select';
+  required: boolean;
+  options: Array<{
+    value: string;
+    label: string;
+  }>;
+}
+
 interface UserProfile {
   id?: number;
-  experience: string;
-  training: string;
+  [key: string]: any;  // Dynamic profile data from JSONB
 }
 
 interface UploadedFile {
@@ -33,6 +43,7 @@ export default function TRForhandlingsbot() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [profileQuestions, setProfileQuestions] = useState<ProfileQuestion[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,6 +55,47 @@ export default function TRForhandlingsbot() {
     scrollToBottom();
   }, [messages]);
 
+  // Fetch profile questions config on mount
+  useEffect(() => {
+    const fetchProfileQuestions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/chat/profile/questions`);
+        const data = await response.json();
+        if (data.questions) {
+          setProfileQuestions(data.questions);
+        }
+      } catch (error) {
+        console.error('Failed to load profile questions:', error);
+        // Fallback to hardcoded questions if API fails
+        setProfileQuestions([
+          {
+            key: 'experience',
+            label: 'Hvor længe har du samlet været TR?',
+            type: 'select',
+            required: true,
+            options: [
+              { value: 'under1', label: 'Under 1 år' },
+              { value: '1-3', label: '1-3 år' },
+              { value: 'over3', label: 'Over 3 år' }
+            ]
+          },
+          {
+            key: 'training',
+            label: 'Har du været på TR-kursus inden for de seneste tre år?',
+            type: 'select',
+            required: true,
+            options: [
+              { value: 'yes', label: 'Ja' },
+              { value: 'no', label: 'Nej' }
+            ]
+          }
+        ]);
+      }
+    };
+
+    fetchProfileQuestions();
+  }, []);
+
   // Check if user has existing profile on mount
   useEffect(() => {
     const checkProfile = async () => {
@@ -53,7 +105,13 @@ export default function TRForhandlingsbot() {
         });
         const data = await response.json();
 
-        if (data.user && data.user.experience && data.user.training) {
+        // Check if user has profile (either in JSONB or legacy columns)
+        const hasProfile = data.user && (
+          (data.user.profile_data && Object.keys(data.user.profile_data).length > 0) ||
+          (data.user.experience && data.user.training)
+        );
+
+        if (hasProfile) {
           setUserProfile(data.user);
           setShowOnboarding(false);
 
@@ -70,10 +128,7 @@ export default function TRForhandlingsbot() {
             setMessages(historyData.messages);
           } else {
             // Show welcome message
-            const welcomeMessage = generateWelcomeMessage(
-              data.user.experience,
-              data.user.training
-            );
+            const welcomeMessage = generateWelcomeMessage(data.user);
             setMessages([{ role: 'assistant', content: welcomeMessage }]);
           }
 
@@ -103,8 +158,12 @@ export default function TRForhandlingsbot() {
     checkProfile();
   }, []);
 
-  const generateWelcomeMessage = (experience: string, training: string) => {
+  const generateWelcomeMessage = (profileData: Record<string, any>) => {
     let welcomeMessage = `Velkommen! Jeg er her for at hjælpe dig med forhandlingsrådgivning. `;
+
+    // Extract experience and training from profile data (backwards compatible)
+    const experience = profileData.experience || profileData.profile_data?.experience;
+    const training = profileData.training || profileData.profile_data?.training;
 
     if (experience === 'under1') {
       welcomeMessage += `Jeg kan se, du er relativt ny som tillidsrepræsentant. `;
@@ -134,8 +193,15 @@ export default function TRForhandlingsbot() {
     return welcomeMessage;
   };
 
-  const handleOnboardingComplete = async (experience: string, training: string) => {
-    if (!experience || !training) return;
+  const handleOnboardingComplete = async () => {
+    // Validate required fields
+    const requiredFields = profileQuestions.filter(q => q.required).map(q => q.key);
+    const missingFields = requiredFields.filter(field => !userProfile?.[field]);
+
+    if (missingFields.length > 0) {
+      alert(`Udfyld venligst alle påkrævede felter`);
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/chat/profile`, {
@@ -144,7 +210,7 @@ export default function TRForhandlingsbot() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ experience, training }),
+        body: JSON.stringify({ profileData: userProfile }),
       });
 
       const data = await response.json();
@@ -154,7 +220,7 @@ export default function TRForhandlingsbot() {
         setUserProfile(profile);
         setShowOnboarding(false);
 
-        const welcomeMessage = generateWelcomeMessage(experience, training);
+        const welcomeMessage = generateWelcomeMessage(userProfile || {});
         setMessages([{ role: 'assistant', content: welcomeMessage }]);
       }
     } catch (error) {
@@ -364,75 +430,50 @@ export default function TRForhandlingsbot() {
           </div>
 
           <div className="space-y-8">
-            <div className="bg-gradient-to-r from-blue-100 to-purple-100 rounded-xl p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                1. Hvor længe har du samlet været TR?
-              </h2>
-              <div className="space-y-3">
-                {[
-                  { value: 'under1', label: 'Under 1 år' },
-                  { value: '1-3', label: '1-3 år' },
-                  { value: 'over3', label: 'Over 3 år' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() =>
-                      setUserProfile({
-                        experience: option.value,
-                        training: userProfile?.training || '',
-                      })
-                    }
-                    className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
-                      userProfile?.experience === option.value
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Dynamically render questions from config */}
+            {profileQuestions.map((question, index) => {
+              const gradients = [
+                'from-blue-100 to-purple-100',
+                'from-purple-100 to-pink-100',
+                'from-pink-100 to-red-100',
+                'from-green-100 to-teal-100'
+              ];
+              const gradient = gradients[index % gradients.length];
 
-            <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                2. Har du været på TR-kursus inden for de seneste tre år?
-              </h2>
-              <div className="space-y-3">
-                {[
-                  { value: 'yes', label: 'Ja' },
-                  { value: 'no', label: 'Nej' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() =>
-                      setUserProfile({
-                        experience: userProfile?.experience || '',
-                        training: option.value,
-                      })
-                    }
-                    className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
-                      userProfile?.training === option.value
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+              return (
+                <div key={question.key} className={`bg-gradient-to-r ${gradient} rounded-xl p-6`}>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                    {index + 1}. {question.label}
+                  </h2>
+                  <div className="space-y-3">
+                    {question.options.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() =>
+                          setUserProfile({
+                            ...userProfile,
+                            [question.key]: option.value,
+                          })
+                        }
+                        className={`w-full py-4 px-6 rounded-lg font-medium transition-all transform hover:scale-105 ${
+                          userProfile?.[question.key] === option.value
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
 
             <button
-              onClick={() =>
-                handleOnboardingComplete(
-                  userProfile?.experience || '',
-                  userProfile?.training || ''
-                )
-              }
-              disabled={!userProfile?.experience || !userProfile?.training}
+              onClick={handleOnboardingComplete}
+              disabled={profileQuestions.filter(q => q.required).some(q => !userProfile?.[q.key])}
               className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all transform ${
-                userProfile?.experience && userProfile?.training
+                profileQuestions.filter(q => q.required).every(q => userProfile?.[q.key])
                   ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:scale-105 shadow-lg'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
