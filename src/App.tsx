@@ -301,6 +301,35 @@ export default function TRForhandlingsbot() {
     }
   };
 
+  const handleNuclearClear = async () => {
+    if (!confirm('🚨 NUCLEAR CLEAR 🚨\n\nDette sletter ALLE beskeder fra databasen for din session.\n\nEr du sikker?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversation`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation');
+      }
+
+      console.log('Nuclear clear: All messages deleted');
+
+      // Clear UI state
+      setMessages([]);
+      setInput('');
+
+      // Refresh page to reset everything
+      window.location.reload();
+    } catch (error) {
+      console.error('Nuclear clear error:', error);
+      alert('Fejl ved sletning. Prøv at refreshe siden.');
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -493,12 +522,23 @@ export default function TRForhandlingsbot() {
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Header */}
       <div className="bg-white shadow-md border-b border-gray-200 p-4">
-        <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-          TR Forhandlingsbot
-        </h1>
-        <p className="text-sm text-gray-600">
-          Din personlige forhandlingsrådgiver
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+              TR Forhandlingsbot
+            </h1>
+            <p className="text-sm text-gray-600">
+              Din personlige forhandlingsrådgiver
+            </p>
+          </div>
+          <button
+            onClick={handleNuclearClear}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-lg transition-all transform hover:scale-105"
+            title="Slet alle beskeder og start forfra"
+          >
+            🧹 Nuclear Clear
+          </button>
+        </div>
       </div>
 
       {/* Uploaded Files */}
